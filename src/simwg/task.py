@@ -17,10 +17,10 @@ class TaskResultStatus(BaseEnum):
 
 
 class TaskPriorityEnum(BaseEnum):
-    LOW = 0
-    NORMAL = 1
-    HIGH = 2
-    SUPREME = 3
+    LOW = 2
+    NORMAL = 3
+    HIGH = 4
+    SUPREME = 5
 
 
 class TaskResult(dict):

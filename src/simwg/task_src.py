@@ -11,7 +11,7 @@ import uuid
 import cPickle as pickle
 from .common import BaseEnum
 from .config import Options
-from .task import TaskData
+from .task import TaskData, TaskPriorityEnum
 
 
 class ManageCommandEnum(BaseEnum):
@@ -30,7 +30,7 @@ class BaseTaskBackend(object):
     def _rand_line(self):
         return unicode(uuid.uuid4()).replace('-', '')
 
-    def new_task_key(self):
+    def new_task_key(self, **params):
         raise NotImplementedError()
 
     def pop_task(self):
@@ -60,9 +60,11 @@ class RedisTaskBackend(BaseTaskBackend):
         pool = redis.ConnectionPool(**self._conf)
         self._connection = redis.Redis(connection_pool=pool)
 
-    def new_task_key(self):
-        new_key = u'{}task_{}'.format(
+    def new_task_key(self, **params):
+        priority = params.get('priority')
+        new_key = u'{}task_{}_{}'.format(
             self._key_prefix,
+            priority or TaskPriorityEnum.NORMAL,
             self._rand_line)
         return new_key
 
@@ -81,7 +83,7 @@ class RedisTaskBackend(BaseTaskBackend):
 
         if task_keys:
             operation_time = time.time()
-            for task_key in task_keys:
+            for task_key in sorted(task_keys, reverse=True):
                 # lock task
                 try:
                     task_data = pickle.loads(

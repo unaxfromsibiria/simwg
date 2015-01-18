@@ -25,9 +25,9 @@ class TaskBackendAdapter(object):
             assert issubclass(task_cls, BaseTaskBackend)
             self._task_src = task_cls(options)
 
-    def new_task_key(self):
+    def new_task_key(self, **params):
         self._init()
-        return self._task_src.new_task_key()
+        return self._task_src.new_task_key(**params)
 
     def new_task(self, task):
         self._init()
@@ -68,7 +68,11 @@ class SimwgTask(object):
         else:
             task_priority = self._priority
 
-        key = task_src.new_task_key()
+        key = task_src.new_task_key(
+            delay=delay,
+            priority=task_priority,
+            timeout=self._timeout)
+
         task_src.new_task(TaskData(
             key=key,
             tid=key,
