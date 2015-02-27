@@ -23,6 +23,11 @@ class TaskPriorityEnum(BaseEnum):
     SUPREME = 5
 
 
+class TaskTypeEnum(BaseEnum):
+    RPC = 1
+    PERIODIC = 2
+
+
 class TaskResult(dict):
 
     def __init__(
@@ -70,6 +75,7 @@ class TaskData(object):
     _returned = None
     _priority = None
     _delay = 0
+    _task_type = None
 
     def __init__(
             self,
@@ -83,6 +89,7 @@ class TaskData(object):
             returned=None,
             priority=TaskPriorityEnum.NORMAL,
             delay=0,
+            task_type=TaskTypeEnum.RPC,
             **kwargs):
 
         if isinstance(result, dict):
@@ -97,6 +104,7 @@ class TaskData(object):
         self._returned = returned
         self._timeout = timeout
         self._priority = priority
+        self._task_type = task_type
 
     def __unicode__(self):
         return u"{}:{}".format(self._method, self._key)
@@ -148,6 +156,14 @@ class TaskData(object):
         if isinstance(value, dict):
             self._result = TaskResult(**value)
 
+    @property
+    def type(self):
+        return self._task_type
+
+    @property
+    def priority(self):
+        return self._priority
+
     def as_dict(self):
         result_dict = {
             'timeout': self._timeout or TaskData.DEFAULT_TIMEOUT,
@@ -159,6 +175,7 @@ class TaskData(object):
             'params': self._params,
             'priority': self._priority,
             'result': None,
+            'task_type': self._task_type,
         }
 
         if self._result:

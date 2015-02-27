@@ -9,13 +9,14 @@ import logging
 
 from . import msg as this_msg
 from .helpers import import_object
-from .task import TaskResultStatus
+from .task import TaskResultStatus, TaskTypeEnum
 
 
 def process_worker(
         index,
         result_queue,
         task,
+        task_type,
         method,
         params,
         delay,
@@ -39,6 +40,9 @@ def process_worker(
         error=None,
         content=None,
         status=TaskResultStatus.DONE)
+
+    if not isinstance(params, dict):
+        params = {}
 
     logger = logging.getLogger(logger_name)
     if delay:

@@ -33,6 +33,10 @@ class BaseEnum(object):
         return result
 
     @classmethod
+    def as_choices(cls):
+        return cls.as_dict().items()
+
+    @classmethod
     def keys(cls):
         result = []
         for field in cls.__dict__:
@@ -46,4 +50,13 @@ class BaseEnum(object):
         for field in cls.__dict__:
             if field == field.upper():
                 result.append(getattr(cls, field))
+        return result
+
+    @classmethod
+    def key(cls, value):
+        result = None
+        for field in cls.__dict__:
+            if field == field.upper() and value == getattr(cls, field):
+                result = field
+                break
         return result

@@ -17,9 +17,11 @@ from random import SystemRandom
 
 from . import msg as this_msg
 from .config import Options
-from .task import TaskResultStatus
+from .helpers import import_object
+from .task import TaskResultStatus, TaskTypeEnum
 from .task_src import (
-    BaseTaskBackend, ManageCommandEnum)
+    BaseTaskBackend, ManageCommandEnum,
+    BasePeriodicTaskBackend)
 from .worker import process_worker
 
 
@@ -84,18 +86,17 @@ class WorkerManager(object):
     _delay_method_name = None
     _delay = 0
     _task_src = None
-    _methods = None
+    _periodic_task_src = None
     _result_tasks_queue = None
     _worker_task_data = None
     _main_frame_id = None
+    _methods_cache = None
 
-    def __init__(self, options, methods):
+    def __init__(self, options):
         """
         :param Options options: configuration object
-        :param list methods: used methods
         """
 
-        self._methods = frozenset(methods)
         assert isinstance(options, Options)
         self._logger = logging.getLogger(options.logger_name)
         self._workers = WorkerPool(options.worker_count)
@@ -106,16 +107,23 @@ class WorkerManager(object):
         task_cls = options.task_backend_cls
         assert issubclass(task_cls, BaseTaskBackend)
         self._task_src = task_cls(options)
+        periodic_task_cls = options.periodic_task_backend_cls
+        assert issubclass(periodic_task_cls, BasePeriodicTaskBackend)
+        self._periodic_task_src = periodic_task_cls(options)
+        self._periodic_task_src.set_main_backend(self._task_src)
+        self._methods_cache = {}
 
         self._worker_task_data = {}
+        info_msg_tpl = (
+            u'{}:{} created\n'
+            u'Backend info:\n{}\n'
+            u'Periodic backend info: {}')
         self._logger.info(
-            u'{}:{} created\n{}\nBackend info:\n{}'.format(
+            info_msg_tpl.format(
                 self.__class__.__name__,
                 id(self),
-                '\n'.join([
-                    '    {}'.format(m_name)
-                    for m_name in methods]),
-                self._task_src.info()))
+                self._task_src.info(),
+                self._periodic_task_src.info()))
 
         def signal_term_handler(signal, frame):
             if self._is_work and self._main_frame_id == id(frame):
@@ -164,7 +172,8 @@ class WorkerManager(object):
                             last_free_indexes.add(worker_index)
                             task.result = result
                             task.returned = time.time()
-                            self._task_src.update_task(task)
+                            if task.type == TaskTypeEnum.RPC:
+                                self._task_src.update_task(task)
                         else:
                             self._logger.error(
                                 u'{} != {} wtf!?'.format(task.key, task_key))
@@ -215,13 +224,28 @@ class WorkerManager(object):
         elif count_free_workers:
 
             for _ in xrange(count_free_workers):
-                task = self._task_src.pop_task()
+                # periodic task first
+                task = self._periodic_task_src.pop_task()
+                # onece tasks
+                if not task:
+                    task = self._task_src.pop_task()
+
                 if task:
                     free_worker_index = self._workers.get_free()
                     logger.debug(
                         this_msg.selected_task.format(task))
 
-                    if task.method in self._methods:
+                    if task.method not in self._methods_cache:
+                        try:
+                            # check
+                            task_method = import_object(task.method)
+                        except Exception as err:
+                            logger.debug(err)
+                        else:
+                            if callable(task_method):
+                                self._methods_cache[task.method] = task_method
+
+                    if task.method in self._methods_cache:
                         # all ok, create process
                         worker = Process(
                             target=process_worker,
@@ -229,6 +253,7 @@ class WorkerManager(object):
                             kwargs={
                                 'index': free_worker_index,
                                 'task': task.key,
+                                'task_type': task.type,
                                 'result_queue': self._result_tasks_queue,
                                 'method': task.method,
                                 'params': task.params,
@@ -242,10 +267,12 @@ class WorkerManager(object):
                         self._workers.busy(free_worker_index)
                         logger.info(
                             this_msg.started_task.format(
-                                task, free_worker_index + 1))
+                                task,
+                                TaskTypeEnum.key(task.type),
+                                free_worker_index + 1))
                         worker.start()
                     else:
                         logger.error(
-                            this_msg.no_methods.format(task))
+                            this_msg.no_methods.format(task, task.method))
                 else:
                     break

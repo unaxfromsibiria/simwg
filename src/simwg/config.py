@@ -46,7 +46,10 @@ class Options(object):
         'delay_method': 'time.sleep',
         'backend': {
         },
+        'periodic_backend': {
+        },
         'backend_cls': 'simwg.RedisTaskBackend',
+        'periodic_backend_cls': 'simwg.ConfigFilePeriodicTaskBackend',
     }
 
     __metaclass__ = MetaOnceObject
@@ -88,6 +91,15 @@ class Options(object):
     @property
     def task_backend_cls(self):
         path = self._get_by_field('backend_cls', str, '')
+        return import_object(path)
+
+    @property
+    def periodic_task_backend_options(self):
+        return self._get_by_field('periodic_backend', dict, None)
+
+    @property
+    def periodic_task_backend_cls(self):
+        path = self._get_by_field('periodic_backend_cls', str, '')
         return import_object(path)
 
     @property

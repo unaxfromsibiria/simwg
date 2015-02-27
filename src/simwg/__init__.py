@@ -8,4 +8,5 @@
 
 from .config import Options
 from .manager import WorkerManager
-from .task_src import RedisTaskBackend
+from .task_src import (
+    RedisTaskBackend, ConfigFilePeriodicTaskBackend)
